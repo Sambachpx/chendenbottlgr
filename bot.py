@@ -26,6 +26,8 @@ CHAT_ID = int(os.environ.get("CHAT_ID", "0"))
 groq_client = Groq(api_key=GROQ_API_KEY)
 DB_PATH = "cupidon.db"
 
+scheduler = AsyncIOScheduler(timezone="UTC")
+
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
@@ -221,7 +223,6 @@ def main() -> None:
 
     app = Application.builder().token(BOT_TOKEN).build()
 
-    scheduler = AsyncIOScheduler()
     scheduler.add_job(
         envoyer_question_auto,
         "cron",
@@ -230,13 +231,17 @@ def main() -> None:
         args=[app],
         id="question_quotidienne",
     )
-    scheduler.start()
 
     app.add_handler(CommandHandler("question", question))
     app.add_handler(CommandHandler("souvenirs", souvenirs))
     app.add_handler(CommandHandler("souvenir", souvenir))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, repondre))
+
+    async def on_start(app: Application) -> None:
+        scheduler.start()
+
+    app.post_init = on_start
 
     logger.info("Bot Cupidon démarré !")
     app.run_polling()
